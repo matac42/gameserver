@@ -90,7 +90,10 @@ def create_user(name: str, leader_card_id: int) -> Optional[str]:
             try:
                 conn.execute(
                     text(
-                        "INSERT INTO `user` (name, token, leader_card_id) VALUES (:name, :token, :leader_card_id)"
+                        """
+                        INSERT INTO `user` (name, token, leader_card_id)
+                            VALUES (:name, :token, :leader_card_id)
+                        """
                     ),
                     dict(name=name, token=token, leader_card_id=leader_card_id),
                 )
@@ -104,7 +107,7 @@ def create_user(name: str, leader_card_id: int) -> Optional[str]:
 
 def _get_user_by_token(conn, token: str) -> Optional[SafeUser]:
     result = conn.execute(
-        text("SELECT `id`, `name`, `leader_card_id` FROM `user` WHERE `token`=:token"),
+        text("""SELECT `id`, `name`, `leader_card_id` FROM `user` WHERE `token`=:token"""),
         dict(token=token),
     )
     try:
@@ -123,7 +126,9 @@ def update_user(token: str, name: str, leader_card_id: int) -> None:
     with engine.begin() as conn:
         result = conn.execute(
             text(
-                "UPDATE `user` SET name=:name, leader_card_id=:leader_card_id where token=:token"
+                """
+                UPDATE `user` SET name=:name, leader_card_id=:leader_card_id WHERE token=:token
+                """
             ),
             dict(token=token, name=name, leader_card_id=leader_card_id),
         )
@@ -138,10 +143,10 @@ def _create_room_member(
     with engine.begin() as conn:
         result = conn.execute(
             text(
-                "INSERT INTO `room_member` \
-                    (room_id, user_id, name, leader_card_id, select_difficulty, is_host) \
-                        VALUES \
-                            (:room_id, :user_id, :name, :leader_card_id, :select_difficulty, :is_host)"
+                """
+                INSERT INTO `room_member` (room_id, user_id, name, leader_card_id, select_difficulty, is_host)
+                    VALUES (:room_id, :user_id, :name, :leader_card_id, :select_difficulty, :is_host)
+                """
             ),
             dict(
                 room_id=room_id,
@@ -159,7 +164,7 @@ def create_room(token: str, live_id: int, select_difficulty: LiveDifficulty) -> 
     """Create new room and returns their id"""
     with engine.begin() as conn:
         result = conn.execute(
-            text("INSERT INTO `room` (live_id) VALUES (:live_id)"),
+            text("""INSERT INTO `room` (live_id) VALUES (:live_id)"""),
             dict(live_id=live_id),
         )
         room_id = result.lastrowid
@@ -172,21 +177,23 @@ def _get_room_list(conn, live_id: int) -> Optional[list[RoomInfo]]:
     if live_id == 0:
         result = conn.execute(
             text(
-                "SELECT `room_id`, `live_id`, `joined_user_count`, `max_user_count` \
-                    FROM `room` \
-                    WHERE `wait_room_status`=:wait_room_status \
-                        AND `joined_user_count` < `max_user_count`"
+                """
+                SELECT `room_id`, `live_id`, `joined_user_count`, `max_user_count` FROM `room`
+                    WHERE `wait_room_status`=:wait_room_status
+                        AND `joined_user_count` < `max_user_count`
+                """
             ),
             dict(live_id=live_id, wait_room_status=WaitRoomStatus.Waiting.value),
         )
     else:
         result = conn.execute(
             text(
-                "SELECT `room_id`, `live_id`, `joined_user_count`, `max_user_count` \
-                    FROM `room` \
-                    WHERE `live_id`=:live_id \
-                        AND `wait_room_status`=:wait_room_status \
-                        AND `joined_user_count` < `max_user_count`"
+                """
+                SELECT `room_id`, `live_id`, `joined_user_count`, `max_user_count` FROM `room`
+                    WHERE `live_id`=:live_id
+                        AND `wait_room_status`=:wait_room_status
+                        AND `joined_user_count` < `max_user_count`
+                """
             ),
             dict(live_id=live_id, wait_room_status=WaitRoomStatus.Waiting.value),
         )
@@ -216,8 +223,10 @@ def _update_room_joined_user_count(
 ) -> None:
     result = conn.execute(
         text(
-            "UPDATE `room` SET joined_user_count=joined_user_count + :inc_dec_num \
-                WHERE room_id=:room_id"
+            """
+            UPDATE `room` SET joined_user_count=joined_user_count + :inc_dec_num
+                WHERE room_id=:room_id
+            """
         ),
         dict(inc_dec_num=inc_dec_num, token=token, room_id=room_id),
     )
@@ -230,8 +239,10 @@ def join_room(
     with engine.begin() as conn:
         result = conn.execute(
             text(
-                "SELECT `joined_user_count`, `max_user_count`, `wait_room_status` FROM `room` \
-                    WHERE `room_id`=:room_id"
+                """
+                SELECT `joined_user_count`, `max_user_count`, `wait_room_status` FROM `room`
+                    WHERE `room_id`=:room_id
+                """
             ),
             dict(room_id=room_id),
         )
@@ -246,7 +257,7 @@ def join_room(
             return JoinRoomResult.OtherError
 
         conn.execute(
-            text("SELECT * FROM `room` WHERE `room_id`=:room_id FOR UPDATE"),
+            text("""SELECT * FROM `room` WHERE `room_id`=:room_id FOR UPDATE"""),
             dict(room_id=room_id),
         )
         _create_room_member(conn, token, room_id, select_difficulty, is_host=False)
@@ -260,7 +271,7 @@ def join_room(
 def get_room_status(token: str, room_id: int) -> Optional[WaitRoomStatus]:
     with engine.begin() as conn:
         result = conn.execute(
-            text("SELECT `wait_room_status` FROM `room` WHERE `room_id`=:room_id"),
+            text("""SELECT `wait_room_status` FROM `room` WHERE `room_id`=:room_id"""),
             dict(room_id=room_id),
         )
     return WaitRoomStatus(result.one().wait_room_status)
@@ -271,8 +282,10 @@ def get_room_user_list(token: str, room_id: int) -> Optional[list[RoomUser]]:
     with engine.begin() as conn:
         result = conn.execute(
             text(
-                "SELECT `user_id`, `name`, `leader_card_id`, `select_difficulty`, `is_host` \
-                    FROM `room_member` WHERE `room_id`=:room_id"
+                """
+                SELECT `user_id`, `name`, `leader_card_id`, `select_difficulty`, `is_host`
+                    FROM `room_member` WHERE `room_id`=:room_id
+                """
             ),
             dict(room_id=room_id),
         )
@@ -298,8 +311,9 @@ def _is_host(room_id: int, user_id: int) -> bool:
     with engine.begin() as conn:
         result = conn.execute(
             text(
-                "SELECT `is_host` FROM `room_member` \
-                    WHERE `room_id`=:room_id AND `user_id`=:user_id"
+                """
+                SELECT `is_host` FROM `room_member` WHERE `room_id`=:room_id AND `user_id`=:user_id
+                """
             ),
             dict(room_id=room_id, user_id=user_id),
         )
@@ -313,7 +327,9 @@ def start_room(token: str, room_id: int) -> None:
     with engine.begin() as conn:
         result = conn.execute(
             text(
-                "UPDATE `room` SET wait_room_status=:wait_room_status WHERE room_id=:room_id"
+                """
+                UPDATE `room` SET wait_room_status=:wait_room_status WHERE room_id=:room_id
+                """
             ),
             dict(wait_room_status=WaitRoomStatus.LiveStart.value, room_id=room_id),
         )
@@ -331,8 +347,10 @@ def end_room(
     with engine.begin() as conn:
         result = conn.execute(
             text(
-                "UPDATE `room_member` SET judge_count_list=:judge_count_list, score=:score \
-                    WHERE room_id=:room_id AND user_id=:user_id"
+                """
+                UPDATE `room_member` SET judge_count_list=:judge_count_list, score=:score 
+                    WHERE room_id=:room_id AND user_id=:user_id
+                """
             ),
             dict(
                 judge_count_list=judge_count_list_json,
@@ -347,21 +365,23 @@ def end_room(
 def get_room_result(room_id: int) -> Optional[list[ResultUser]]:
     with engine.begin() as conn:
         result = conn.execute(
-            text("SELECT `joined_user_count` FROM `room` WHERE `room_id`=:room_id"),
+            text("""SELECT `joined_user_count` FROM `room` WHERE `room_id`=:room_id"""),
             dict(room_id=room_id),
         )
         joined_user_count = result.one().joined_user_count
 
         result = conn.execute(
-            text("SELECT COUNT(score) FROM `room_member` WHERE `room_id`=:room_id"),
+            text("""SELECT COUNT(score) FROM `room_member` WHERE `room_id`=:room_id"""),
             dict(room_id=room_id),
         )
         score_count = result.scalar()
         if joined_user_count == score_count:
             result = conn.execute(
                 text(
-                    "SELECT `user_id`, `judge_count_list`, `score` FROM `room_member` \
-                        WHERE `room_id`=:room_id"
+                    """
+                    SELECT `user_id`, `judge_count_list`, `score` FROM `room_member`
+                        WHERE `room_id`=:room_id
+                    """
                 ),
                 dict(room_id=room_id),
             )
@@ -388,8 +408,10 @@ def _delete_room_member(conn, token: str, room_id: int) -> None:
         # ホストでないユーザーを探す
         result = conn.execute(
             text(
-                "SELECT `user_id` FROM `room_member` \
-                    WHERE `room_id`=:room_id AND `is_host`=false"
+                """
+                SELECT `user_id` FROM `room_member`
+                    WHERE `room_id`=:room_id AND `is_host`=false
+                """
             ),
             dict(room_id=room_id),
         )
@@ -398,8 +420,10 @@ def _delete_room_member(conn, token: str, room_id: int) -> None:
         if become_host is None:
             result = conn.execute(
                 text(
-                    "UPDATE `room` SET wait_room_status=:wait_room_status \
-                        WHERE room_id=:room_id"
+                    """
+                    UPDATE `room` SET wait_room_status=:wait_room_status
+                        WHERE room_id=:room_id
+                    """
                 ),
                 dict(
                     wait_room_status=WaitRoomStatus.Dissolution.value,
@@ -410,8 +434,10 @@ def _delete_room_member(conn, token: str, room_id: int) -> None:
         # ホストでないユーザー1人をホストに昇格する
         result = conn.execute(
             text(
-                "UPDATE `room_member` SET is_host=true \
-                    WHERE room_id=:room_id AND user_id=:user_id"
+                """
+                UPDATE `room_member` SET is_host=true
+                    WHERE room_id=:room_id AND user_id=:user_id
+                """
             ),
             dict(
                 room_id=room_id,
@@ -420,7 +446,9 @@ def _delete_room_member(conn, token: str, room_id: int) -> None:
         )
     result = conn.execute(
         text(
-            "DELETE FROM `room_member` WHERE `room_id`=:room_id AND `user_id`=:user_id"
+            """
+            DELETE FROM `room_member` WHERE `room_id`=:room_id AND `user_id`=:user_id
+            """
         ),
         dict(room_id=room_id, user_id=user_id),
     )
