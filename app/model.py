@@ -107,7 +107,9 @@ def create_user(name: str, leader_card_id: int) -> Optional[str]:
 
 def _get_user_by_token(conn, token: str) -> Optional[SafeUser]:
     result = conn.execute(
-        text("""SELECT `id`, `name`, `leader_card_id` FROM `user` WHERE `token`=:token"""),
+        text(
+            """SELECT `id`, `name`, `leader_card_id` FROM `user` WHERE `token`=:token"""
+        ),
         dict(token=token),
     )
     try:
